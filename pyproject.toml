@@ -1,0 +1,33 @@
+[project]
+name = "klong"
+version = "0.1.0"
+description = "KLong: Training LLM Agent for Extremely Long-horizon Tasks"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1.0",
+    "transformers>=4.40.0",
+    "trl>=0.12.0",
+    "peft>=0.13.0",
+    "accelerate>=1.0.0",
+    "bitsandbytes>=0.44.0",
+    "datasets>=3.0.0",
+    "anthropic>=0.40.0",
+    "arxiv>=2.1.0",
+    "pymupdf4llm>=0.0.10",
+    "docker>=7.0.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "tqdm>=4.65.0",
+    "jsonlines>=4.0.0",
+    "tiktoken>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0", "pytest-asyncio>=0.24.0"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["klong*"]

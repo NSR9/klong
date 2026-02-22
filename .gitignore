@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project data
+data/
+checkpoints/
+results/
+*.pt
+*.bin
+*.safetensors
+
+# Environment
+.env
+.env.local
+
+# Docker
+klong/agent/sandbox/Dockerfile.local
