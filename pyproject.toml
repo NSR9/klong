@@ -20,6 +20,7 @@ dependencies = [
     "tqdm>=4.65.0",
     "jsonlines>=4.0.0",
     "tiktoken>=0.7.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]

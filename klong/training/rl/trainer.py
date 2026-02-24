@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import json
 import logging
 import asyncio
@@ -56,14 +57,28 @@ class ProgressiveRLTrainer:
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
 
+        if torch.cuda.is_available():
+            dtype = torch.bfloat16
+            device = "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+            dtype = torch.float32
+            device = "mps"
+        else:
+            dtype = torch.float32
+            device = "cpu"
+
+        logger.info(f"Loading model on {device} with dtype {dtype}")
         model = AutoModelForCausalLM.from_pretrained(
-            self.model_name, trust_remote_code=True,
-            torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+            self.model_name, trust_remote_code=True, torch_dtype=dtype,
         )
         if Path(self.sft_checkpoint).exists():
             model = PeftModel.from_pretrained(model, self.sft_checkpoint)
             model = model.merge_and_unload()
             logger.info(f"Loaded SFT checkpoint from {self.sft_checkpoint}")
+
+        if device != "cpu":
+            model = model.to(device)
 
         return model, tokenizer
 

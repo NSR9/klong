@@ -22,13 +22,20 @@ env/
 .DS_Store
 Thumbs.db
 
-# Project data
+# Large files — model weights, training data, checkpoints
 data/
 checkpoints/
-results/
 *.pt
 *.bin
 *.safetensors
+*.gguf
+*.ggml
+
+# Results — keep report and plots, exclude raw eval data
+results/experiment/
+results/experiment_v2/
+results/experiment_v3/
+results/eval_results.json
 
 # Environment
 .env

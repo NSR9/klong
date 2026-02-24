@@ -22,12 +22,23 @@ def main():
     args = parser.parse_args()
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
+    import os
     import torch
 
+    if torch.cuda.is_available():
+        dtype, device = torch.bfloat16, "cuda"
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+        dtype, device = torch.float32, "mps"
+    else:
+        dtype, device = torch.float32, "cpu"
+
+    logger.info(f"Loading model on {device} with dtype {dtype}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
-        args.model_path, trust_remote_code=True,
-        torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32)
+        args.model_path, trust_remote_code=True, torch_dtype=dtype)
+    if device != "cpu":
+        model = model.to(device)
 
     rollout_gen = RolloutGenerator(model, tokenizer)
     judge = Judge(model="claude-opus-4-20250514")

@@ -94,15 +94,49 @@ class Agent:
         """Set the LLM generation function: fn(messages) -> str"""
         self._generate_fn = fn
 
+    @staticmethod
+    def _fix_json_newlines(s: str) -> str:
+        """Escape literal newlines inside JSON string values."""
+        result = []
+        in_string = False
+        escape = False
+        for ch in s:
+            if escape:
+                result.append(ch)
+                escape = False
+                continue
+            if ch == '\\':
+                result.append(ch)
+                escape = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                result.append(ch)
+                continue
+            if ch == '\n' and in_string:
+                result.append('\\n')
+                continue
+            if ch == '\t' and in_string:
+                result.append('\\t')
+                continue
+            result.append(ch)
+        return ''.join(result)
+
     def parse_tool_calls(self, text: str) -> list[dict]:
         pattern = r'```tool_call\s*\n(.*?)\n```'
         matches = re.findall(pattern, text, re.DOTALL)
         calls = []
         for m in matches:
+            raw = m.strip()
             try:
-                calls.append(json.loads(m.strip()))
+                calls.append(json.loads(raw))
             except json.JSONDecodeError:
-                logger.warning(f"Failed to parse tool call: {m[:100]}")
+                # Try fixing unescaped newlines/tabs in JSON string values
+                try:
+                    fixed = self._fix_json_newlines(raw)
+                    calls.append(json.loads(fixed))
+                except (json.JSONDecodeError, Exception):
+                    logger.warning(f"Failed to parse tool call: {raw[:100]}")
         return calls
 
     def run(self, sandbox_id: str, task_description: str,
@@ -127,6 +161,10 @@ class Agent:
 
             response_text = self._generate_fn(messages)
             tool_calls = self.parse_tool_calls(response_text)
+
+            # Detect "end_task" as plain text (model often writes it without tool_call block)
+            if not tool_calls and "end_task" in response_text.strip().lower():
+                tool_calls = [{"name": "end_task", "arguments": {}}]
 
             turn = Turn(role="assistant", content=response_text, tool_calls=tool_calls)
             trajectory.add_turn(turn)
@@ -162,6 +200,11 @@ class Agent:
                 obs_turn = Turn(role="user", content=obs_text, tool_results=results)
                 trajectory.add_turn(obs_turn)
                 messages.append({"role": "user", "content": obs_text})
+            else:
+                # No tool calls — prompt the model to use tools or end the task
+                nudge = "Please use the available tools to make progress, or use end_task if you are done."
+                messages.append({"role": "user", "content": nudge})
+                trajectory.add_turn(Turn(role="user", content=nudge))
 
             turn_count += 1
 

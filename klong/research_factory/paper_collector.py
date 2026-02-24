@@ -43,9 +43,12 @@ class PaperCollector:
         self.blacklist = Blacklist()
 
     def _extract_github_url(self, text: str) -> Optional[str]:
-        pattern = r'https?://github\.com/[\w\-]+/[\w\-]+'
+        pattern = r'https?://github\.com/[\w\-\.]+/[\w\-\.]+'
         match = re.search(pattern, text)
-        return match.group(0) if match else None
+        if match:
+            url = match.group(0).rstrip(".")
+            return url
+        return None
 
     def search_papers(self) -> list[PaperRecord]:
         papers = []
@@ -58,7 +61,7 @@ class PaperCollector:
             client = arxiv.Client()
             search = arxiv.Search(
                 query=query,
-                max_results=per_conf * 3,
+                max_results=per_conf * 5,
                 sort_by=arxiv.SortCriterion.SubmittedDate,
             )
 
@@ -66,9 +69,11 @@ class PaperCollector:
             for result in client.results(search):
                 if count >= per_conf:
                     break
-                github_url = self._extract_github_url(
-                    result.summary + " ".join(str(l) for l in result.links)
-                )
+                search_text = result.summary
+                if result.comment:
+                    search_text += " " + result.comment
+                search_text += " " + " ".join(str(l) for l in result.links)
+                github_url = self._extract_github_url(search_text)
                 if not github_url:
                     continue
 

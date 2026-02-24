@@ -3,6 +3,7 @@ import uuid
 import time
 import io
 import tarfile
+import threading
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -55,17 +56,39 @@ class SandboxManager:
 
     def execute(self, sandbox_id: str, command: str, timeout: int = 300) -> ExecResult:
         container = self._containers[sandbox_id]
-        try:
-            exec_result = container.exec_run(
-                ["bash", "-c", command],
-                workdir=self.config.workspace_dir,
-                demux=True,
-            )
-            stdout = (exec_result.output[0] or b"").decode("utf-8", errors="replace")
-            stderr = (exec_result.output[1] or b"").decode("utf-8", errors="replace")
-            return ExecResult(stdout=stdout, stderr=stderr, exit_code=exec_result.exit_code)
-        except Exception as e:
-            return ExecResult(stdout="", stderr=str(e), exit_code=-1)
+        result_holder: list[ExecResult] = []
+
+        def _run():
+            try:
+                exec_result = container.exec_run(
+                    ["bash", "-c", command],
+                    workdir=self.config.workspace_dir,
+                    demux=True,
+                )
+                stdout = (exec_result.output[0] or b"").decode("utf-8", errors="replace")
+                stderr = (exec_result.output[1] or b"").decode("utf-8", errors="replace")
+                result_holder.append(ExecResult(
+                    stdout=stdout, stderr=stderr, exit_code=exec_result.exit_code))
+            except Exception as e:
+                result_holder.append(ExecResult(stdout="", stderr=str(e), exit_code=-1))
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+        thread.join(timeout=timeout)
+
+        if thread.is_alive():
+            # Kill the running command by executing kill inside the container
+            try:
+                container.exec_run(["bash", "-c", "kill -9 -1"], detach=True)
+            except Exception:
+                pass
+            return ExecResult(
+                stdout="", stderr=f"Command timed out after {timeout}s",
+                exit_code=-1, timed_out=True)
+
+        if result_holder:
+            return result_holder[0]
+        return ExecResult(stdout="", stderr="Unknown error", exit_code=-1)
 
     def write_file(self, sandbox_id: str, path: str, content: str) -> None:
         container = self._containers[sandbox_id]
